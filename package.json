@@ -15,5 +15,6 @@
     "csv-parser": "^3.0.0",
     "elasticsearch": "^16.7.3",
     "express": "^4.21.1"
-  }
+  },
+  "type": "module"
 }

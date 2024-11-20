@@ -1,30 +1,43 @@
-const { Client } = require('@elastic/elasticsearch');
-const fs = require('fs');
-const csv = require('csv-parser');
+import { Client } from '@elastic/elasticsearch';
+import fs from 'fs';
+import csv from 'csv-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get the __filename equivalent and __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Correct the path to the CSV file (ensure it's in the same directory or adjust accordingly)
+const csvFilePath = path.join(__dirname, 'Texas_Last_Statement.csv');  // Adjust path if necessary
+console.log('CSV file path:', csvFilePath);  // Print out to verify the path
+
+// Set up the Elasticsearch client
+const certPath = path.join(__dirname, '..', 'http_ca.crt');  // Adjust path if necessary
 
 const esClient = new Client({
   node: 'https://localhost:9200', // Secure connection (https)
   auth: {
-    username: 'elastic', // Elasticsearch username
-    password: 'cSCbnHyH-DOaUNQiIOXx', // Loaded password
+    username: 'elastic',
+    password: 'cSCbnHyH-DOaUNQiIOXx',
   },
   tls: {
-    ca: fs.readFileSync('../http_ca.crt'), // Path to your SSL certificate
-    rejectUnauthorized: false, // May be required for self-signed certs
+    ca: fs.readFileSync(certPath), // Use correct certificate path
+    rejectUnauthorized: false,  // Optional: set to true if you want to enforce certificate validation
   },
 });
 
 // Function to index CSV data into Elasticsearch
-const indexDataFromCSV = async (csvFilePath, indexName) => {
+export const indexDataFromCSV = async (csvFilePath, indexName) => {
   const results = [];
   
   fs.createReadStream(csvFilePath)
     .pipe(csv())
     .on('data', (row) => results.push(row))
     .on('end', async () => {
-      // Prepare the bulk request body
+      // Prepare the bulk request body with unique _id (TDCJNumber)
       const body = results.flatMap((doc) => [
-        { index: { _index: indexName } },
+        { index: { _index: indexName, _id: doc.TDCJNumber } },  // Use TDCJNumber as the unique ID
         doc,
       ]);
 
@@ -47,8 +60,5 @@ const indexDataFromCSV = async (csvFilePath, indexName) => {
 };
 
 // Path to your CSV file and Elasticsearch index name
-const csvFilePath = 'Texas_Last_Statement.csv';
-const indexName = 'prisoners';
+const indexName = 'prisoners'; // DeathRows
 
-// Call the function to index the data
-indexDataFromCSV(csvFilePath, indexName);

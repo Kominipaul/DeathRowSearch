@@ -1,0 +1,46 @@
+
+body {
+    font-family: 'Roboto Mono', monospace;
+}
+
+.search {
+    width: 100%;
+    margin-top: 100px;
+    margin-bottom: 50px;
+}
+
+.card {
+    padding: 15px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    border-radius: 20px;
+
+    background-color: #263344;
+    transition: background-color 0.5s ease, color 0.5s ease; 
+    outline-color: aliceblue;
+    display: flex;
+}
+
+.card:hover {
+    background-color: #2d3d52;
+}
+
+
+.text {
+    color: aliceblue;
+}
+
+.MugShot {
+    width: 150px;
+    margin: 15px;
+}
+
+.showMore {
+    width: 100%;
+    display: block;
+    margin: 10px;
+}
+
+.showMore {
+    text-align: center;
+}
