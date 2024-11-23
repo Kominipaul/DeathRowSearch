@@ -1,6 +1,8 @@
 
 body {
     font-family: 'Roboto Mono', monospace;
+    width: 100%;
+    max-width: 1200px;
 }
 
 .search {
@@ -43,4 +45,77 @@ body {
 
 .showMore {
     text-align: center;
+}
+
+
+.card-header h3 {
+    font-size: 1.2em;
+    margin: 0;
+}
+
+.card-header .header-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.card-header .header-details span {
+    font-size: 0.9em;
+    color: #777;
+}
+
+/* Content sections layout (details, additional, and last statement) */
+.card-details,
+.additional-details,
+.last-statement {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+}
+
+.card-details p,
+.additional-details p,
+.last-statement p {
+    margin: 5px 0;
+}
+
+.card-details {
+    margin-bottom: 25px;
+}
+
+/* Responsive layout for the content inside the card */
+.card-header, .card-details, .additional-details, .last-statement {
+    width: 100%; /* Ensure the sections take full width */
+}
+
+.card-details {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+/* Styling for the individual card data */
+.card-details .detail-item {
+    width: 48%; /* Ensure each item takes up half of the space */
+    margin-bottom: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-details .detail-item span {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.last-statement {
+    font-size: 0.9em;
+    max-height: 340px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}
+
+.last-statement p {
+    margin: 5px 0;
+    white-space: pre-line; /* Preserve line breaks */
 }
