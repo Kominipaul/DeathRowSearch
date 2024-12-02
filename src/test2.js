@@ -1,34 +1,3 @@
-import express from 'express';
-import fs from 'fs';
-import { Client } from '@elastic/elasticsearch';
-import path from 'path';
-import { indexDataFromCSV } from './index_data.js';
-import { fileURLToPath } from 'url';
-
-const app = express();
-const port = 3000;
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const csvFilePath = path.join(__dirname, 'Texas_Last_Statement.csv'); // Adjust path if necessary
-const indexName = 'prisoners';
-
-// Serve static files from the "public" directory
-app.use(express.static(path.join(__dirname, '..', 'public')));
-
-const esClient = new Client({
-  node: 'https://localhost:9200',
-  auth: {
-    username: 'elastic',
-    password: 'cSCbnHyH-DOaUNQiIOXx',
-  },
-  tls: {
-    ca: fs.readFileSync(path.resolve('..', 'http_ca.crt')), // Resolving path for the certificate
-    rejectUnauthorized: false,
-  },
-});
-
 // Tokenizer: Breaks input into tokens
 function tokenize(input) {
     const tokens = [];
@@ -144,53 +113,11 @@ function buildElasticQuery(input) {
     return { query: translateToElastic(ast) };
 }
 
-// API endpoint to fetch data from Elasticsearch
-app.get('/api/statements', async (req, res) => {
-    console.log('Query Parameters:', req.query); // Log all query parameters
-    const { filter } = req.query;
+// Example Usage
+const input = "Race != Hispanic OR (Age => 32 AND Victims < 5)";
+const elasticQuery = buildElasticQuery(input);
 
-    console.log('Filter:', filter); // Log the `filter` parameter
+console.log(JSON.stringify(elasticQuery, null, 2));
 
-    if (!filter) {
-        return res.status(400).json({ error: 'Filter parameter is required' });
-    }
 
-    try {
-        // Use the buildElasticQuery function to convert the filter into an Elasticsearch query
-        const esQuery = buildElasticQuery(filter);
 
-        console.log('Elasticsearch query:', JSON.stringify(esQuery, null, 2));
-
-        // Perform the search query
-        const response = await esClient.search({
-            index: indexName,
-            body: esQuery, // Directly send the query object
-        });
-
-        // Check if we have hits in the response
-        if (response?.hits?.hits?.length > 0) {
-            // Send back the hits as the response
-            res.json(response.hits.hits);
-        } else {
-            // If no results were found, return 404 with an error message
-            res.status(404).json({ error: 'No results found' });
-        }
-    } catch (err) {
-        // Handle any errors that occur during the search
-        console.error('Error fetching data from Elasticsearch:', err);
-        res.status(500).json({ error: 'Failed to fetch data' });
-    }
-});
-
-// Index the data from CSV
-indexDataFromCSV(csvFilePath, indexName);
-
-// Serve index.html for the root route
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
-});
-
-// Start the server and listen on the specified port
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});

@@ -1,44 +1,27 @@
 function translateQuery(expression) {
   const operators = {
     "!=": "must_not",
-    ">": "gt",
-    "<": "lt",
     ">=": "gte",
     "<=": "lte",
+    "=>": "gte",
+    "=<": "lte",
+    ">": "gt",
+    "<": "lt",
     "=": "term"
   };
 
   function parseExpression(expression) {
-    // Handle parentheses for precedence
-    if (expression.includes("(")) {
-      const stack = [];
-      let start = -1;
+    // Handle parentheses recursively
+    while (expression.includes("(")) {
+      const start = expression.lastIndexOf("(");
+      const end = expression.indexOf(")", start);
+      if (end === -1) throw new Error("Mismatched parentheses in expression.");
 
-      for (let i = 0; i < expression.length; i++) {
-        if (expression[i] === "(") {
-          if (start === -1) start = i;
-          stack.push(i);
-        } else if (expression[i] === ")") {
-          stack.pop();
-          if (stack.length === 0) {
-            const inner = expression.substring(start + 1, i);
-            const parsedInner = parseExpression(inner);
-            const before = expression.substring(0, start);
-            const after = expression.substring(i + 1);
-            return parseExpression(before + `__P${start}__` + after);
-          }
-        }
-      }
-    }
+      const inner = expression.substring(start + 1, end);
+      const parsedInner = parseExpression(inner);  // Recursively parse inner expression
 
-    // Handle OR
-    if (expression.includes(" OR ")) {
-      const clauses = expression.split(" OR ").map(clause => clause.trim());
-      return {
-        bool: {
-          should: clauses.map(parseExpression)
-        }
-      };
+      // Replace the entire parenthesis with parsed object (don't stringify it)
+      expression = expression.substring(0, start) + JSON.stringify(parsedInner) + expression.substring(end + 1);
     }
 
     // Handle AND
@@ -51,39 +34,64 @@ function translateQuery(expression) {
       };
     }
 
+    // Handle OR
+    if (expression.includes(" OR ")) {
+      const clauses = expression.split(" OR ").map(clause => clause.trim());
+      return {
+        bool: {
+          should: clauses.map(parseExpression)
+        }
+      };
+    }
+
+    // Handle NOT
+    if (expression.startsWith("NOT ")) {
+      const operand = expression.substring(4).trim();
+      return {
+        bool: {
+          must_not: parseExpression(operand)
+        }
+      };
+    }
+
     // Parse individual condition
-    return parseCondition(expression.trim(), operators);
+    return parseCondition(expression.trim());
   }
 
-  function parseCondition(condition, operators) {
+  function parseCondition(condition) {
+    // Ensure that condition is not already parsed object
+    if (typeof condition === 'object') {
+      return condition; // Already parsed object, just return it
+    }
+
     for (const [op, esOp] of Object.entries(operators)) {
       if (condition.includes(op)) {
         const [field, value] = condition.split(op).map(str => str.trim());
+        if (!field || !value) throw new Error(`Invalid condition: "${condition}"`);
+
         const formattedValue = value.replace(/['"]/g, ""); // Remove quotes
+
         if (esOp === "term") {
           return { term: { [field]: formattedValue } };
         } else if (esOp === "must_not") {
           return { bool: { must_not: { term: { [field]: formattedValue } } } };
         } else {
-          return { range: { [field]: { [esOp]: isNaN(formattedValue) ? formattedValue : parseFloat(formattedValue) } } };
+          return {
+            range: {
+              [field]: {
+                [esOp]: isNaN(formattedValue) ? formattedValue : parseFloat(formattedValue)
+              }
+            }
+          };
         }
       }
     }
-    throw new Error(`Unsupported condition: ${condition}`);
+    throw new Error(`Unsupported condition: "${condition}"`);
   }
 
-  // Parse the full expression
   return parseExpression(expression);
 }
 
-// Example usage
-const expression0 = "Victims = 1 OR Age > 20 AND Age < 40";
-const expression1 = "Age > 20 AND Age < 40 AND Race = Hispanic OR Victims != 1";
-const query = translateQuery(expression0);
-const query1 = translateQuery(expression1);
-
-
-
-// Log the resulting query
-//console.log(JSON.stringify(query, null, 2));
+const input = 'NOT (Race != Hispanic OR Age => 32 AND Victims < 5)';
+const query = translateQuery(input);
 console.log(JSON.stringify(query, null, 2));
