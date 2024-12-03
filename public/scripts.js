@@ -21,10 +21,12 @@ async function fetchResults(filter, append = false) {
         const data = await response.json();
         const resultsContainer = document.getElementById('results');
 
+        // Clear previous results if not appending
         if (!append) {
-            resultsContainer.innerHTML = ''; // Clear previous results if not appending
+            resultsContainer.innerHTML = ''; 
         }
 
+        // Check if no data is available and handle the "No results found" case
         if (data.length === 0 && !append) {
             resultsContainer.innerHTML = '<p>No results found.</p>';
             return;
@@ -36,7 +38,6 @@ async function fetchResults(filter, append = false) {
 
         // Populate the results container with fetched data
         data.forEach(person => {
-            // Create the card element
             const card = document.createElement('div');
             card.classList.add('card');
 
@@ -126,13 +127,15 @@ async function fetchResults(filter, append = false) {
 // Add an event listener for the 'keypress' event on the search input
 searchInput.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') {
-        currentOffset = 0; // Reset pagination
-        fetchResults(searchInput.value, false);
+        currentOffset = 0; // Reset pagination to 0 for the new query
+        document.getElementById('show-more').disabled = false; // Re-enable "Show More" button
+        document.getElementById('show-more').innerText = 'Show More'; // Reset the text
+        fetchResults(searchInput.value, false); // Fetch new results without appending
     }
 });
 
 // Add "Show More" functionality
 document.getElementById('show-more').addEventListener('click', () => {
-    currentOffset += pageSize; // Increment the offset
-    fetchResults(searchInput.value, true); // Append results
+    currentOffset += pageSize; // Increment the offset for pagination
+    fetchResults(searchInput.value, true); // Append new results to the current results
 });
