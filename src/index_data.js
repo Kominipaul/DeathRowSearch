@@ -19,7 +19,7 @@ const esClient = new Client({
   node: 'https://localhost:9200', // Secure connection (https)
   auth: {
     username: 'elastic',
-    password: 'cSCbnHyH-DOaUNQiIOXx',
+    password: process.env.ELASTIC_PASSWORD,
   },
   tls: {
     ca: fs.readFileSync(certPath), // Use correct certificate path

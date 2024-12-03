@@ -21,7 +21,7 @@ const esClient = new Client({
   node: 'https://localhost:9200',
   auth: {
     username: 'elastic',
-    password: 'cSCbnHyH-DOaUNQiIOXx',
+    password: process.env.ELASTIC_PASSWORD,
   },
   tls: {
     ca: fs.readFileSync(path.resolve('..', 'http_ca.crt')), // Resolving path for the certificate
@@ -112,17 +112,27 @@ function parse(tokens) {
 
 // Translator: Converts AST to Elasticsearch query
 function translateToElastic(node) {
-    if (node.type === "COMPARISON") {
-        const { field, operator, value } = node;
-        if (operator === "=") return { term: { [field]: value } };
-        if (operator === "!=") return { bool: { must_not: { term: { [field]: value } } } };
-        if (operator === ">") return { range: { [field]: { gt: value } } };
-        if (operator === "<") return { range: { [field]: { lt: value } } };
-        if (operator === ">=") return { range: { [field]: { gte: value } } };
-        if (operator === "<=") return { range: { [field]: { lte: value } } };
-        if (operator === "=>") return { range: { [field]: { gte: value } } };
-        if (operator === "=<") return { range: { [field]: { lte: value } } };
-    }
+  if (node.type === "COMPARISON") {
+    const { field, operator, value } = node;
+
+    // Use match for case-insensitive equality
+    if (operator === "=") return { match: { [field]: value } };
+
+    // Must_not for inequality with match query
+    if (operator === "!=") return {
+        bool: {
+            must_not: {
+                match: { [field]: value }
+            }
+        }
+    };
+
+    // Range queries remain the same
+    if (operator === ">") return { range: { [field]: { gt: value } } };
+    if (operator === "<") return { range: { [field]: { lt: value } } };
+    if (operator === ">=") return { range: { [field]: { gte: value } } };
+    if (operator === "<=") return { range: { [field]: { lte: value } } };
+  }
 
     if (node.type === "LOGICAL") {
         if (node.operator === "AND") {
@@ -145,10 +155,11 @@ function buildElasticQuery(input) {
 }
 
 // API endpoint to fetch data from Elasticsearch
+
 app.get('/api/statements', async (req, res) => {
     console.log('Query Parameters:', req.query); // Log all query parameters
-    const { filter } = req.query;
-
+    const { filter, from, size } = req.query;
+    
     console.log('Filter:', filter); // Log the `filter` parameter
 
     if (!filter) {
@@ -159,12 +170,15 @@ app.get('/api/statements', async (req, res) => {
         // Use the buildElasticQuery function to convert the filter into an Elasticsearch query
         const esQuery = buildElasticQuery(filter);
 
+        // Log the Elasticsearch query in the terminal before executing it
         console.log('Elasticsearch query:', JSON.stringify(esQuery, null, 2));
 
-        // Perform the search query
+        // Perform the search query with the pagination (from and size)
         const response = await esClient.search({
             index: indexName,
-            body: esQuery, // Directly send the query object
+            body: esQuery,
+            from: from || 0,   // Pagination: starting point (default to 0)
+            size: size || 10,  // Pagination: page size (default to 10)
         });
 
         // Check if we have hits in the response
