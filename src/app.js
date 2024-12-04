@@ -3,6 +3,7 @@ import fs from 'fs';
 import { Client } from '@elastic/elasticsearch';
 import path from 'path';
 import { indexDataFromCSV } from './index_data.js';
+import { editRecord } from './index_data.js';
 import { fileURLToPath } from 'url';
 
 const app = express();
@@ -155,11 +156,10 @@ function buildElasticQuery(input) {
 }
 
 // API endpoint to fetch data from Elasticsearch
-
-app.get('/api/statements', async (req, res) => {
+app.get('/api/queries', async (req, res) => {
     console.log('Query Parameters:', req.query); // Log all query parameters
     const { filter, from, size } = req.query;
-    
+
     console.log('Filter:', filter); // Log the `filter` parameter
 
     if (!filter) {
@@ -177,23 +177,50 @@ app.get('/api/statements', async (req, res) => {
         const response = await esClient.search({
             index: indexName,
             body: esQuery,
-            from: from || 0,   // Pagination: starting point (default to 0)
-            size: size || 10,  // Pagination: page size (default to 10)
+            from: parseInt(from, 10) || 0,   // Pagination: starting point (default to 0)
+            size: parseInt(size, 10) || 10, // Pagination: page size (default to 10)
         });
 
         // Check if we have hits in the response
-        if (response?.hits?.hits?.length > 0) {
+        if (response?.hits?.hits) {
             // Send back the hits as the response
             res.json(response.hits.hits);
         } else {
-            // If no results were found, return 404 with an error message
-            res.status(404).json({ error: 'No results found' });
+            // If no results were found, return an empty array
+            res.json([]);
         }
     } catch (err) {
         // Handle any errors that occur during the search
         console.error('Error fetching data from Elasticsearch:', err);
         res.status(500).json({ error: 'Failed to fetch data' });
     }
+});
+
+app.use(express.json());
+
+// API endpoint for Editing Date
+app.put('/api/edit', async (req, res) => {
+  try {
+    // Extracting the command from the request body
+    const { command } = req.body;
+
+    // Ensure the command is provided
+    if (!command) {
+      return res.status(400).send('Command is required.');
+    }
+
+    console.log('Received Edit Request:');
+    console.log('Command:', command);
+
+    // Call the editRecord function with the required parameters
+    await editRecord(command, csvFilePath, indexName);
+
+    // Send a success response
+    res.status(200).send('Record edited successfully.');
+  } catch (error) {
+    console.error('Error processing edit request:', error);
+    res.status(500).send('An error occurred while editing the record.');
+  }
 });
 
 // Index the data from CSV
