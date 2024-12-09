@@ -6,14 +6,23 @@ document.getElementById('help').addEventListener('close', (event) => {
     // Optional: Handle dialog close event
 });
 
+document.getElementById('help-trigger').addEventListener('click', () => {
+    document.getElementById('help').showModal();
+});
+
+document.getElementById('help').addEventListener('close', (event) => {
+    // Optional: Handle dialog close event
+});
+
 const searchInput = document.getElementById('search');
 let currentOffset = 0;
 const pageSize = 10;
+let hasMoreResults = true; // Variable to track if there are more results
 
 // Function to fetch and display results
 async function fetchResults(filter, append = false) {
     try {
-        const response = await fetch(`/api/statements?filter=${encodeURIComponent(filter)}&from=${currentOffset}&size=${pageSize}`);
+        const response = await fetch(`/api/queries?filter=${encodeURIComponent(filter)}&from=${currentOffset}&size=${pageSize}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -21,23 +30,28 @@ async function fetchResults(filter, append = false) {
         const data = await response.json();
         const resultsContainer = document.getElementById('results');
 
-        // Clear previous results if not appending
         if (!append) {
-            resultsContainer.innerHTML = ''; 
+            resultsContainer.innerHTML = ''; // Clear previous results if not appending
         }
 
-        // Check if no data is available and handle the "No results found" case
         if (data.length === 0 && !append) {
             resultsContainer.innerHTML = '<p>No results found.</p>';
-            return;
-        } else if (data.length === 0) {
+            // Disable "Show More" if no results are found
             document.getElementById('show-more').disabled = true;
             document.getElementById('show-more').innerText = 'No more results';
+            hasMoreResults = false;
+            return;
+        } else if (data.length === 0) {
+            // Disable "Show More" if no more results
+            document.getElementById('show-more').disabled = true;
+            document.getElementById('show-more').innerText = 'No more results';
+            hasMoreResults = false;
             return;
         }
 
         // Populate the results container with fetched data
         data.forEach(person => {
+            // Create the card element
             const card = document.createElement('div');
             card.classList.add('card');
 
@@ -119,6 +133,12 @@ async function fetchResults(filter, append = false) {
             // Append the card to the results container
             resultsContainer.appendChild(card);
         });
+
+        // Enable "Show More" if there are still results
+        if (hasMoreResults) {
+            document.getElementById('show-more').disabled = false;
+            document.getElementById('show-more').innerText = 'Show More';
+        }
     } catch (error) {
         console.error('Error fetching data:', error);
     }
@@ -127,15 +147,16 @@ async function fetchResults(filter, append = false) {
 // Add an event listener for the 'keypress' event on the search input
 searchInput.addEventListener('keypress', (event) => {
     if (event.key === 'Enter') {
-        currentOffset = 0; // Reset pagination to 0 for the new query
-        document.getElementById('show-more').disabled = false; // Re-enable "Show More" button
-        document.getElementById('show-more').innerText = 'Show More'; // Reset the text
-        fetchResults(searchInput.value, false); // Fetch new results without appending
+        currentOffset = 0; // Reset pagination
+        hasMoreResults = true; // Reset the "no more results" flag
+        fetchResults(searchInput.value, false);
     }
 });
 
 // Add "Show More" functionality
 document.getElementById('show-more').addEventListener('click', () => {
-    currentOffset += pageSize; // Increment the offset for pagination
-    fetchResults(searchInput.value, true); // Append new results to the current results
+    if (hasMoreResults) {
+        currentOffset += pageSize; // Increment the offset
+        fetchResults(searchInput.value, true); // Append results
+    }
 });
