@@ -48,7 +48,10 @@ async function fetchResults(filter, append = false) {
             const mugShotDiv = document.createElement('div');
             mugShotDiv.classList.add('mugshot');
             const mugShotImg = document.createElement('img');
-            mugShotImg.src = 'https://avatars.githubusercontent.com/u/40539574?v=4'; // Replace with dynamic data if available
+            mugShotImg.src = `https://www.tdcj.texas.gov/death_row/dr_info/${person._source.LastName}${person._source.FirstName}2.jpg`;
+            mugShotImg.onerror = () => {
+                mugShotImg.src = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
+            };
             mugShotImg.alt = 'Mug_Shot';
             mugShotImg.classList.add('mugshot-img');
             mugShotDiv.appendChild(mugShotImg);
