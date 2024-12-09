@@ -4,61 +4,203 @@ import csv from 'csv-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Get the __filename equivalent and __dirname equivalent in ES modules
+// Get __filename and __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Correct the path to the CSV file (ensure it's in the same directory or adjust accordingly)
-const csvFilePath = path.join(__dirname, 'Texas_Last_Statement.csv');  // Adjust path if necessary
-console.log('CSV file path:', csvFilePath);  // Print out to verify the path
+// CSV and certificate paths
+const csvFilePath = path.join(__dirname, 'Texas_Last_Statement.csv');
+const certPath = path.join(__dirname, '..', 'http_ca.crt');
 
-// Set up the Elasticsearch client
-const certPath = path.join(__dirname, '..', 'http_ca.crt');  // Adjust path if necessary
+// Validate file paths
+if (!fs.existsSync(csvFilePath)) {
+  console.error('CSV file not found:', csvFilePath);
+  process.exit(1);
+}
+if (!fs.existsSync(certPath)) {
+  console.error('Certificate file not found:', certPath);
+  process.exit(1);
+}
 
+// Elasticsearch client setup
 const esClient = new Client({
-  node: 'https://localhost:9200', // Secure connection (https)
+  node: 'https://localhost:9200',
   auth: {
     username: 'elastic',
-    password: process.env.ELASTIC_PASSWORD,
+    password: process.env.ELASTIC_PASSWORD || 'changeme', // Default if not provided
   },
   tls: {
-    ca: fs.readFileSync(certPath), // Use correct certificate path
-    rejectUnauthorized: false,  // Optional: set to true if you want to enforce certificate validation
+    ca: fs.readFileSync(certPath),
+    rejectUnauthorized: false,
   },
 });
 
-// Function to index CSV data into Elasticsearch
-export const indexDataFromCSV = async (csvFilePath, indexName) => {
+// Function to read CSV and clean data
+const readCSV = async (csvFilePath) => {
   const results = [];
-  
-  fs.createReadStream(csvFilePath)
-    .pipe(csv())
-    .on('data', (row) => results.push(row))
-    .on('end', async () => {
-      // Prepare the bulk request body with unique _id (TDCJNumber)
-      const body = results.flatMap((doc) => [
-        { index: { _index: indexName, _id: doc.TDCJNumber } },  // Use TDCJNumber as the unique ID
-        doc,
-      ]);
-
-      try {
-        const bulkResponse = await esClient.bulk({ refresh: true, body });
-
-        // Log the full bulk response for debugging
-        console.log('Bulk Response:', bulkResponse);
-
-        // Access errors directly from the bulk response (not through body)
-        if (bulkResponse.errors) {
-          console.error('Bulk indexing errors occurred:', bulkResponse.errors);
-        } else {
-          console.log('Data indexed successfully');
-        }
-      } catch (err) {
-        console.error('Error indexing data:', err);
-      }
-    });
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(csvFilePath)
+      .pipe(csv())
+      .on('data', (row) => {
+        // Data cleaning and validation
+        row.Age = parseInt(row.Age, 10) || null;
+        row.TDCJNumber = row.TDCJNumber?.trim() || null;
+        row.Race = row.Race?.trim() || 'Unknown';
+        if (row.TDCJNumber) results.push(row); // Only push valid rows
+      })
+      .on('end', () => resolve(results))
+      .on('error', (err) => reject(err));
+  });
 };
 
-// Path to your CSV file and Elasticsearch index name
-const indexName = 'prisoners'; // DeathRows
+// Function to bulk index data into Elasticsearch
+const bulkIndexData = async (indexName, data) => {
+  const chunkSize = 500; // Define batch size for indexing
+  for (let i = 0; i < data.length; i += chunkSize) {
+    const chunk = data.slice(i, i + chunkSize).flatMap((doc) => [
+      { index: { _index: indexName, _id: doc.TDCJNumber } },
+      doc,
+    ]);
+
+    try {
+      const bulkResponse = await esClient.bulk({ refresh: true, body: chunk });
+      if (bulkResponse.errors) {
+        // Identify and log failed documents
+        const erroredDocs = bulkResponse.items.filter((item) => item.index?.error);
+        console.error('Errors occurred in the following documents:', JSON.stringify(erroredDocs, null, 2));
+      } else {
+        console.log(`Successfully indexed chunk ${i / chunkSize + 1}`);
+      }
+    } catch (err) {
+      console.error(`Error indexing chunk ${i / chunkSize + 1}:`, err);
+    }
+  }
+};
+
+// Main function to read, process, and index data
+export const indexDataFromCSV = async (csvFilePath, indexName) => {
+  console.log('Starting CSV data indexing...');
+  try {
+    const data = await readCSV(csvFilePath);
+    console.log(`Successfully read ${data.length} records from the CSV.`);
+    await bulkIndexData(indexName, data);
+    console.log('Data indexing completed successfully.');
+  } catch (err) {
+    console.error('Error during indexing process:', err);
+  }
+};
+
+// Index name
+const indexName = 'prisoners'; // Adjust as needed
+
+// Execute the indexing
+indexDataFromCSV(csvFilePath, indexName);
+
+// Edit Record
+
+export const parseEditCommand = (command) => {
+  const regex = /EDIT TDCJ = (\d+)\s*\((.*?)\);/;
+  const match = command.match(regex);
+  
+  if (!match) {
+    throw new Error("Invalid command format.");
+  }
+  
+  const tdcjNumber = match[1];
+  const updates = match[2].split(',').reduce((acc, pair) => {
+    const [key, value] = pair.split('=').map((str) => str.trim());
+    if (key && value) {
+      // Allow quoted values to handle strings with spaces (like "White")
+      acc[key] = value.startsWith('"') && value.endsWith('"')
+        ? value.slice(1, -1) // Remove quotes
+        : value; // Otherwise it's treated as a number or boolean
+    }
+    return acc;
+  }, {});
+  
+  return { tdcjNumber, updates };
+};
+
+
+export const updateElasticsearchDocument = async (tdcjNumber, updates, indexName) => {
+  try {
+    const updateBody = { doc: updates };
+    const response = await esClient.update({
+      index: indexName,
+      id: tdcjNumber,
+      body: updateBody,
+    });
+    console.log(`Document with TDCJNumber ${tdcjNumber} updated in Elasticsearch.`);
+    return response;
+  } catch (err) {
+    console.error('Error updating document in Elasticsearch:', err);
+    throw err;
+  }
+};
+
+
+export const updateCSV = (csvFilePath, tdcjNumber, updates) => {
+  return new Promise((resolve, reject) => {
+    const results = [];
+    let updated = false;
+
+    fs.createReadStream(csvFilePath)
+      .pipe(csv())
+      .on('data', (row) => {
+        if (row.TDCJNumber === tdcjNumber) {
+          // Update the row with the new values (and handle field renaming)
+          Object.keys(updates).forEach((field) => {
+            // If the field exists, update it, otherwise add a new one
+            if (row.hasOwnProperty(field)) {
+              row[field] = updates[field];
+            } else {
+              row[field] = updates[field]; // Add the new field if not found
+            }
+          });
+          updated = true;
+        }
+        results.push(row);
+      })
+      .on('end', () => {
+        if (updated) {
+          // Write the updated data back to the CSV file
+          const headers = Object.keys(results[0]);
+          const csvOutput = [
+            headers.join(','), // CSV header
+            ...results.map((row) => headers.map((field) => row[field]).join(','))
+          ].join('\n');
+          
+          fs.writeFileSync(csvFilePath, csvOutput, 'utf8');
+          console.log(`CSV file updated successfully.`);
+        } else {
+          console.error(`TDCJNumber ${tdcjNumber} not found in the CSV.`);
+        }
+        resolve();
+      })
+      .on('error', reject);
+  });
+};
+
+
+export const editRecord = async (command, csvFilePath, indexName) => {
+  try {
+    // Parse the edit command
+    const { tdcjNumber, updates } = parseEditCommand(command);
+
+    // Update Elasticsearch document
+    await updateElasticsearchDocument(tdcjNumber, updates, indexName);
+
+    // Update CSV file
+    await updateCSV(csvFilePath, tdcjNumber, updates);
+
+    console.log('Record edited successfully.');
+  } catch (err) {
+    console.error('Error editing the record:', err);
+  }
+};
+
+// Example usage:
+const command = 'EDIT TDCJ = 807 (Age = 100, Race = "White");';
+
+//editRecord(command, csvFilePath, indexName);
 
