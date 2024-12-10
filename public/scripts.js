@@ -2,6 +2,13 @@ document.getElementById('help-trigger').addEventListener('click', () => {
     document.getElementById('help').showModal();
 });
 
+function closeHelp() {
+    const helpDialog = document.getElementById('help');
+    if (helpDialog) {
+        helpDialog.close();
+    }
+}
+
 document.getElementById('help').addEventListener('close', (event) => {
     // Optional: Handle dialog close event
 });

@@ -65,26 +65,50 @@
         <div>
             <button id="help-trigger" class="help">Help</button>
         </div>
-
+        
         <dialog id="help">
-            <head>Helpfull Examples</head>
+            <head>
+                <title>Search Help Menu</title>
+            </head>
             <form action="help">
-                <p>Helpfull Examples</p>
+                <p>Search Help</p>
                 <menu>
-                    <button>Name</button>
-                    <button>Name</button>
-                    <button>Name</button>
-                    <button>Name</button>
-                    <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Corporis quaea et hic.</p>
-                    <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Corporis quaea et hic.</p>
-                    <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Corporis quaea et hic.</p>
-                    <p>Lorem ipsum dolor sit amet consectetur adipisicing elit. Corporis quaea et hic.</p>
-
+                    <p>Available Fields:</p>
+                    <ul>
+                        <li><code>Execution</code>, <code>LastName</code>, <code>FirstName</code>, <code>TDCJNumber</code></li>
+                        <li><code>Age</code>, <code>Race</code>, <code>CountyOfConviction</code>, <code>AgeWhenReceived</code></li>
+                        <li><code>EducationLevel</code>, <code>NativeCounty</code>, <code>PreviousCrime</code>, <code>Codefendants</code></li>
+                        <li><code>NumberVictim</code>, <code>WhiteVictim</code>, <code>HispanicVictim</code>, <code>BlackVictim</code></li>
+                        <li><code>VictimOtherRaces</code>, <code>FemaleVictim</code>, <code>MaleVictim</code>, <code>LastStatement</code></li>
+                    </ul>
+        
+                    <p>Search Examples:</p>
+                    <ul>
+                        <li><code>FirstName = Paul</code> - First name is Paul.</li>
+                        <li><code>Race = Black</code> - Records where race is Black.</li>
+                        <li><code>Age > 30 OR Age < 20</code> - Age above 30 or below 20.</li>
+                        <li><code>Race = Black AND NOT CountyOfConviction = Harris</code> - Exclude Harris County.</li>
+                        <li><code>(Race = White AND Age >= 40) OR (Race = Hispanic AND NumberVictim > 2)</code> - Combine multiple criteria.</li>
+                    </ul>
+        
+                    <p>Comparison Operators:</p>
+                    <ul>
+                        <li><code>=</code>, <code>!=</code>, <code><</code>, <code>></code>, <code>=<</code>, <code>=></code></li>
+                    </ul>
+        
+                    <p>Tips:</p>
+                    <ul>
+                        <li>Combine conditions using <code>AND</code>, <code>OR</code>, and <code>NOT</code>.</li>
+                        <li>Group conditions with parentheses for clarity.</li>
+                        <li>Search is case-insensitive.</li>
+                    </ul>
+                </menu>
+                <menu>
+                    <button type="button" onclick="closeHelp()">Close</button>
                 </menu>
             </form>
         </dialog>
-
+        
     </body>
     <script src="scripts.js"></script>
-
 </html>
