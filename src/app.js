@@ -3,7 +3,7 @@ import fs from 'fs';
 import { Client } from '@elastic/elasticsearch';
 import path from 'path';
 import { indexDataFromCSV } from './index_data.js';
-import { editRecord } from './index_data.js';
+import { editRecord, deleteFromCSV, deleteFromElasticsearch, parseDeleteCommand } from './index_data.js';
 import { fileURLToPath } from 'url';
 
 const app = express();
@@ -19,15 +19,15 @@ const indexName = 'prisoners';
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const esClient = new Client({
-  node: 'https://localhost:9200',
-  auth: {
-    username: 'elastic',
-    password: process.env.ELASTIC_PASSWORD,
-  },
-  tls: {
-    ca: fs.readFileSync(path.resolve('..', 'http_ca.crt')), // Resolving path for the certificate
-    rejectUnauthorized: false,
-  },
+    node: 'https://localhost:9200',
+    auth: {
+        username: 'elastic',
+        password: process.env.ELASTIC_PASSWORD,
+    },
+    tls: {
+        ca: fs.readFileSync(path.resolve('..', 'http_ca.crt')), // Resolving path for the certificate
+        rejectUnauthorized: false,
+    },
 });
 
 // Tokenizer: Breaks input into tokens
@@ -113,27 +113,27 @@ function parse(tokens) {
 
 // Translator: Converts AST to Elasticsearch query
 function translateToElastic(node) {
-  if (node.type === "COMPARISON") {
-    const { field, operator, value } = node;
+    if (node.type === "COMPARISON") {
+        const { field, operator, value } = node;
 
-    // Use match for case-insensitive equality
-    if (operator === "=") return { match: { [field]: value } };
+        // Use match for case-insensitive equality
+        if (operator === "=") return { match: { [field]: value } };
 
-    // Must_not for inequality with match query
-    if (operator === "!=") return {
-        bool: {
-            must_not: {
-                match: { [field]: value }
+        // Must_not for inequality with match query
+        if (operator === "!=") return {
+            bool: {
+                must_not: {
+                    match: { [field]: value }
+                }
             }
-        }
-    };
+        };
 
-    // Range queries remain the same
-    if (operator === ">") return { range: { [field]: { gt: value } } };
-    if (operator === "<") return { range: { [field]: { lt: value } } };
-    if (operator === ">=") return { range: { [field]: { gte: value } } };
-    if (operator === "<=") return { range: { [field]: { lte: value } } };
-  }
+        // Range queries remain the same
+        if (operator === ">") return { range: { [field]: { gt: value } } };
+        if (operator === "<") return { range: { [field]: { lt: value } } };
+        if (operator === ">=") return { range: { [field]: { gte: value } } };
+        if (operator === "<=") return { range: { [field]: { lte: value } } };
+    }
 
     if (node.type === "LOGICAL") {
         if (node.operator === "AND") {
@@ -200,28 +200,60 @@ app.use(express.json());
 
 // API endpoint for Editing Date
 app.put('/api/edit', async (req, res) => {
-  try {
-    // Extracting the command from the request body
-    const { command } = req.body;
+    try {
+        // Extracting the command from the request body
+        const { command } = req.body;
 
-    // Ensure the command is provided
-    if (!command) {
-      return res.status(400).send('Command is required.');
+        // Ensure the command is provided
+        if (!command) {
+            return res.status(400).send('Command is required.');
+        }
+
+        console.log('Received Edit Request:');
+        console.log('Command:', command);
+
+        // Call the editRecord function with the required parameters
+        await editRecord(command, csvFilePath, indexName);
+
+        // Send a success response
+        res.status(200).send('Record edited successfully.');
+    } catch (error) {
+        console.error('Error processing edit request:', error);
+        res.status(500).send('An error occurred while editing the record.');
     }
-
-    console.log('Received Edit Request:');
-    console.log('Command:', command);
-
-    // Call the editRecord function with the required parameters
-    await editRecord(command, csvFilePath, indexName);
-
-    // Send a success response
-    res.status(200).send('Record edited successfully.');
-  } catch (error) {
-    console.error('Error processing edit request:', error);
-    res.status(500).send('An error occurred while editing the record.');
-  }
 });
+
+// Delete API endpoint
+app.delete('/api/delete', async (req, res) => {
+    try {
+        // Extracting the command from the request body
+        const { command } = req.body;
+
+        // Ensure the command is provided
+        if (!command) {
+            return res.status(400).send('Command is required.');
+        }
+
+        console.log('Received Delete Request Command:', command);
+
+        // Parse the command to extract the TDCJNumber
+        const tdcjNumber = parseDeleteCommand(command);
+
+        // Perform the deletion in Elasticsearch
+        await deleteFromElasticsearch(tdcjNumber, indexName);
+
+        // Optionally, remove the record from the CSV
+        const csvFilePath = path.join(__dirname, 'Texas_Last_Statement.csv');
+        await deleteFromCSV(csvFilePath, tdcjNumber);
+
+        // Send a success response
+        res.status(200).send(`Record with TDCJNumber ${tdcjNumber} deleted successfully.`);
+    } catch (error) {
+        console.error('Error processing delete request:', error);
+        res.status(500).send('An error occurred while deleting the record.');
+    }
+});
+
 
 // Index the data from CSV
 indexDataFromCSV(csvFilePath, indexName);
@@ -233,5 +265,5 @@ app.get('/', (req, res) => {
 
 // Start the server and listen on the specified port
 app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+    console.log(`Server running at http://localhost:${port}`);
 });

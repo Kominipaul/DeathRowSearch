@@ -97,9 +97,8 @@ const indexName = 'prisoners'; // Adjust as needed
 indexDataFromCSV(csvFilePath, indexName);
 
 // Edit Record
-
 export const parseEditCommand = (command) => {
-  const regex = /EDIT TDCJ = (\d+)\s*\((.*?)\);/;
+  const regex = /TDCJ = (\d+)\s*\((.*?)\);/;
   const match = command.match(regex);
   
   if (!match) {
@@ -129,6 +128,7 @@ export const updateElasticsearchDocument = async (tdcjNumber, updates, indexName
       index: indexName,
       id: tdcjNumber,
       body: updateBody,
+      refresh: true,
     });
     console.log(`Document with TDCJNumber ${tdcjNumber} updated in Elasticsearch.`);
     return response;
@@ -199,8 +199,71 @@ export const editRecord = async (command, csvFilePath, indexName) => {
   }
 };
 
-// Example usage:
-const command = 'EDIT TDCJ = 807 (Age = 100, Race = "White");';
 
-//editRecord(command, csvFilePath, indexName);
+
+// DELETE Command
+export const parseDeleteCommand = (command) => {
+  const regex = /TDCJ = (\d+);?/;
+  const match = command.match(regex);
+
+  if (!match) {
+    throw new Error("Invalid command format.");
+  }
+
+  const tdcjNumber = match[1];
+  return tdcjNumber;
+};
+
+export const deleteFromElasticsearch = async (tdcjNumber, indexName) => {
+  try {
+    const response = await esClient.delete({
+      index: indexName,
+      id: tdcjNumber,
+    });
+
+    if (response.result === 'not_found') {
+      throw new Error(`Document with TDCJNumber ${tdcjNumber} not found in Elasticsearch.`);
+    }
+
+    console.log(`Document with TDCJNumber ${tdcjNumber} deleted from Elasticsearch.`);
+  } catch (err) {
+    console.error('Error deleting document from Elasticsearch:', err);
+    throw err;
+  }
+};
+
+export const deleteFromCSV = async (csvFilePath, tdcjNumber) => {
+  const results = [];
+  let deleted = false;
+
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(csvFilePath)
+      .pipe(csv())
+      .on('data', (row) => {
+        if (row.TDCJNumber === tdcjNumber) {
+          deleted = true; // Skip this record
+        } else {
+          results.push(row);
+        }
+      })
+      .on('end', () => {
+        if (deleted) {
+          const headers = Object.keys(results[0]);
+          const csvOutput = [
+            headers.join(','), // CSV header
+            ...results.map((row) => headers.map((field) => row[field]).join(','))
+          ].join('\n');
+
+          fs.writeFileSync(csvFilePath, csvOutput, 'utf8');
+          console.log(`CSV file updated: Record with TDCJNumber ${tdcjNumber} deleted.`);
+        } else {
+          console.error(`TDCJNumber ${tdcjNumber} not found in the CSV.`);
+        }
+        resolve();
+      })
+      .on('error', reject);
+  });
+};
+
+
 
