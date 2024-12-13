@@ -35,7 +35,7 @@ body {
     color: aliceblue;
 }
 
-.MugShot {
+.mugshot-img {
     width: 150px;
     margin: 15px;
 }
@@ -121,4 +121,20 @@ body {
 .last-statement p {
     margin: 5px 0;
     white-space: pre-line; /* Preserve line breaks */
+}
+
+.delete-button {
+  width: 120px;
+}
+
+.edit-button {
+  width: 120px;
+}
+
+.cancel-button {
+  width: 120px;
+}
+
+.save-button {
+  width: 120px;
 }

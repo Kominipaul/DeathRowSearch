@@ -1,13 +1,13 @@
-document.getElementById('help-trigger').addEventListener('click', () => {
-    document.getElementById('help').showModal();
-});
-
 function closeHelp() {
     const helpDialog = document.getElementById('help');
     if (helpDialog) {
         helpDialog.close();
     }
 }
+
+document.getElementById('help-trigger').addEventListener('click', () => {
+    document.getElementById('help').showModal();
+});
 
 document.getElementById('help').addEventListener('close', (event) => {
     // Optional: Handle dialog close event
@@ -57,15 +57,16 @@ async function fetchResults(filter, append = false) {
         }
 
         // Populate the results container with fetched data
+        // Populate the results container with fetched data
         data.forEach(person => {
             // Create the card element
             const card = document.createElement('div');
             card.classList.add('card');
-
+        
             // Add MugShot and Basic Info
             const cardHeader = document.createElement('div');
             cardHeader.classList.add('card-header');
-
+        
             const mugShotDiv = document.createElement('div');
             mugShotDiv.classList.add('mugshot');
             const mugShotImg = document.createElement('img');
@@ -76,7 +77,7 @@ async function fetchResults(filter, append = false) {
             mugShotImg.alt = 'Mug_Shot';
             mugShotImg.classList.add('mugshot-img');
             mugShotDiv.appendChild(mugShotImg);
-
+        
             const cardDetails = document.createElement('div');
             cardDetails.classList.add('card-details');
             const name = document.createElement('h3');
@@ -87,15 +88,34 @@ async function fetchResults(filter, append = false) {
             county.textContent = `County of Conviction: ${person._source.CountyOfConviction}`;
             const tdcjNumber = document.createElement('p');
             tdcjNumber.textContent = `TDCJ Number: ${person._source.TDCJNumber}`;
-
+        
             cardDetails.appendChild(name);
             cardDetails.appendChild(ageRace);
             cardDetails.appendChild(county);
             cardDetails.appendChild(tdcjNumber);
-
+        
             cardHeader.appendChild(mugShotDiv);
             cardHeader.appendChild(cardDetails);
-
+        
+            const buttonDiv = document.createElement('div');
+            buttonDiv.classList.add('button-div');
+            
+            // Delete Button
+            const deleteButton = document.createElement('button');
+            deleteButton.textContent = 'Delete';
+            deleteButton.classList.add('delete-button');
+        
+            // Add the delete functionality when the button is clicked
+            deleteButton.onclick = () => deleteRecord(person._source.TDCJNumber, card);
+        
+            // Edit Button
+            const editButton = document.createElement('button');
+            editButton.textContent = 'Edit';
+            editButton.classList.add('edit-button');
+            editButton.onclick = () => openEditField(person._source.TDCJNumber, card);
+        
+            card.appendChild(cardHeader);
+            
             // Add Additional Details
             const additionalDetails = document.createElement('div');
             additionalDetails.classList.add('additional-details');
@@ -115,15 +135,15 @@ async function fetchResults(filter, append = false) {
                 { label: "Female Victim", value: person._source.FemaleVictim },
                 { label: "Male Victim", value: person._source.MaleVictim },
             ];
-
+        
             details.forEach(detail => {
                 const listItem = document.createElement('li');
                 listItem.innerHTML = `<strong>${detail.label}:</strong> ${detail.value}`;
                 additionalList.appendChild(listItem);
             });
-
+        
             additionalDetails.appendChild(additionalList);
-
+        
             // Add Last Statement
             const lastStatement = document.createElement('div');
             lastStatement.classList.add('last-statement');
@@ -131,28 +151,117 @@ async function fetchResults(filter, append = false) {
             statementHeading.textContent = 'Last Statement';
             const statementPara = document.createElement('p');
             statementPara.textContent = person._source.LastStatement;
-
+        
             lastStatement.appendChild(statementHeading);
             lastStatement.appendChild(statementPara);
-
+        
             // Append everything to the card
             card.appendChild(cardHeader);
             card.appendChild(additionalDetails);
             card.appendChild(lastStatement);
 
             // Append the card to the results container
-            resultsContainer.appendChild(card);
-        });
+            resultsContainer.appendChild(card);            
+            // Add the buttons to the button button-div
+            card.appendChild(buttonDiv);
+            buttonDiv.appendChild(deleteButton);
+            buttonDiv.appendChild(editButton);
+        
+            // Function to open the edit field
+            function openEditField(tdcjNumber, card) {
+                // Check if the input field already exists
+                if (card.querySelector('.edit-field')) return;
+        
+                // Create input field, save button, and delete button
+                const editField = document.createElement('div');
+                editField.classList.add('edit-field');
+        
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.placeholder = 'Enter updates, e.g., Age = 100, Race = "White"';
+        
+                const saveButton = document.createElement('button');
+                saveButton.textContent = 'Save';
+                saveButton.classList.add('save-button');
+                saveButton.onclick = () => saveEdit(tdcjNumber, input.value, card);
+        
+                const CancelButton = document.createElement('button');
+                CancelButton.textContent = 'Cancel';
+                CancelButton.classList.add('cancel-button');
+                CancelButton.onclick = () => card.removeChild(editField);
+        
+                editField.appendChild(input);
+                editField.appendChild(saveButton);
+                editField.appendChild(CancelButton);
+        
+                card.appendChild(editField);
+            }
+        
+            
+            async function deleteRecord(tdcjNumber, card) {
+                const fullCommand = `TDCJ = ${tdcjNumber}`;
 
-        // Enable "Show More" if there are still results
-        if (hasMoreResults) {
-            document.getElementById('show-more').disabled = false;
-            document.getElementById('show-more').innerText = 'Show More';
-        }
-    } catch (error) {
+                try {
+                    // Sending the DELETE request to the server with the command
+                    const response = await fetch('/api/delete', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command: fullCommand })
+                    });
+
+                    // Check if the response is successful
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    // Show success message
+                    alert('Record deleted successfully!');
+
+                    // Debugging: Check if the card element is valid
+                    console.log('Card element:', card);
+                    card.remove();
+                } catch (error) {
+                    // Handle any errors during the deletion process
+                    console.error('Error deleting record:', error);
+                    alert('Failed to delete the record. Please try again.');
+                }
+            }
+        
+            // Save Edit Function
+            async function saveEdit(tdcjNumber, command, card) {
+                if (!command.trim()) {
+                    alert('Please enter a valid command.');
+                    return;
+                }
+        
+                const fullCommand = `TDCJ = ${tdcjNumber} (${command});`;
+        
+                try {
+                    const response = await fetch('/api/edit', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command: fullCommand })
+                    });
+        
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+        
+                    alert('Record updated successfully!');
+                    card.querySelector('.edit-field').remove(); // Remove the input field after saving
+                    fetchResults(searchInput.value); // Refresh the results
+                } catch (error) {
+                    console.error('Error saving edit:', error);
+                    alert('Failed to save changes. Please try again.');
+                }
+            }
+        });
+    }
+    catch (error) {
         console.error('Error fetching data:', error);
     }
 }
+
 
 // Add an event listener for the 'keypress' event on the search input
 searchInput.addEventListener('keypress', (event) => {
