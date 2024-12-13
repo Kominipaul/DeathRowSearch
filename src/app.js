@@ -254,6 +254,55 @@ app.delete('/api/delete', async (req, res) => {
     }
 });
 
+// API endpoint to add a new prisoner
+app.post('/api/add', async (req, res) => {
+    try {
+        // Extract prisoner data from the request body
+        const prisonerData = req.body;
+
+        // Ensure required fields are present
+        if (!prisonerData.TDCJNumber || !prisonerData.LastName || !prisonerData.LastStatement) {
+            return res.status(400).send('TDCJNumber, LastName, and LastStatement are required fields.');
+        }
+
+        // Add the new prisoner to Elasticsearch with refresh: "true"
+        const esResponse = await esClient.index({
+            index: indexName,
+            id: prisonerData.tdcjNumber,
+            body: prisonerData,
+            refresh: 'true', // Ensure immediate availability
+        });
+
+        if (esResponse.result !== 'created') {
+            throw new Error('Failed to add prisoner to Elasticsearch');
+        }
+
+        console.log('Prisoner added to Elasticsearch:', esResponse);
+
+        // Append the prisoner to the CSV file
+        const csvRow = [
+            prisonerData.tdcjNumber,
+            prisonerData.firstName,
+            prisonerData.lastName,
+            prisonerData.ageAtOffense,
+            prisonerData.race,
+            prisonerData.county,
+            prisonerData.lastStatement.replace(/\n/g, ' '), // Replace newlines in last statement
+        ].join(',');
+
+        fs.appendFile(csvFilePath, `\n${csvRow}`, (err) => {
+            if (err) throw err;
+            console.log('Prisoner added to CSV file.');
+        });
+
+        // Send a success response
+        res.status(200).send('Prisoner added successfully.');
+    } catch (error) {
+        console.error('Error adding prisoner:', error);
+        res.status(500).send('An error occurred while adding the prisoner.');
+    }
+});
+
 
 // Index the data from CSV
 indexDataFromCSV(csvFilePath, indexName);
