@@ -22,7 +22,6 @@ document.getElementById('help').addEventListener('close', (event) => {
 });
 
 const searchInput = document.getElementById('search');
-const addinput = document.getElementById('add');
 let currentOffset = 0;
 const pageSize = 10;
 let hasMoreResults = true; // Variable to track if there are more results
@@ -274,109 +273,152 @@ searchInput.addEventListener('keypress', (event) => {
     }
 });
 
-addinput.addEventListener('keypress', (event) => {
-    if (event.key === 'Enter') {
-        const fullName = addinput.value.trim();
-        
-        if (fullName) {
-            // Split the name into last name and first name
-            const [lastName, firstName] = fullName.split(' ').map(part => part.trim());
-            if (lastName && firstName) {
-                // Create a dynamic URL using the last name and first name
-                const name = `${lastName.toLowerCase()}${firstName.toLowerCase()}`;
-                const url = `https://thingproxy.freeboard.io/fetch/https://www.tdcj.texas.gov/death_row/dr_info/${name}.html`;
-                fetch(url)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    return response.text();
-                })
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-    
-                    const cells = Array.from(doc.querySelectorAll("td"));
-                    const nameIndex = cells.findIndex(cell => cell.textContent.trim() === "Name");
-    
-                    if (nameIndex !== -1) {
-                        var fullName = cells[nameIndex + 1].textContent.trim();
-                        var [lastName, firstName] = fullName.split(',').map(part => part.trim());
-                        var [firstName, fullName] = firstName.split(' ').map(part => part.trim());
-    
-                        const tdcjNumber = getDataFromTable(cells, "TDCJ Number");            
-                        const dateReceived = getDataFromTable(cells, "Date Received");
-                        const ageWhenReceived = getDataFromTable(cells, "Age (when Received)");
-                        const educationLevel = getDataFromTable(cells, "Education Level (Highest Grade Completed)");
-                        const ageAtOffense = getDataFromTable(cells, "Age (at the time of Offense)");
-                        const county = getDataFromTable(cells, "County");
-                        const race = getDataFromTable(cells, "Race");
-                        const gender = getDataFromTable(cells, "Gender");;
-                        const nativeCounty = getDataFromTable(cells, "Native County");
-    
-                        const data = {
-                            firstName: firstName,
-                            lastName: lastName,
-                            tdcjNumber: tdcjNumber,
-                            ageWhenReceived: ageWhenReceived,
-                            educationLevel: educationLevel,
-                            ageAtOffense: ageAtOffense,
-                            county: county,
-                            race: race,
-                            gender: gender,
-                            nativeCounty: nativeCounty,
-                        };
-    
-                          // Fetch the last statement from the second page
-                        const lastStatementUrl = `https://thingproxy.freeboard.io/fetch/https://www.tdcj.texas.gov/death_row/dr_info/${name}last.html`;
+// Assuming the input field with id 'addinput' is where the user enters the name
+document.addEventListener('DOMContentLoaded', () => {
+    const addinput = document.getElementById('addinput');
 
-                        fetch(lastStatementUrl)
+    if (addinput) {
+        addinput.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                const fullName = addinput.value.trim();
+        
+                if (fullName) {
+                    // Split the name into last name and first name
+                    const [lastName, firstName] = fullName.split(' ').map(part => part.trim());
+                    if (lastName && firstName) {
+                        // Create a dynamic URL using the last name and first name
+                        const name = `${lastName.toLowerCase()}${firstName.toLowerCase()}`;
+                        const url = `https://thingproxy.freeboard.io/fetch/https://www.tdcj.texas.gov/death_row/dr_info/${name}.html`;
+        
+                        fetch(url)
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error(`HTTP error! Status: ${response.status}`);
                                 }
                                 return response.text();
                             })
-                            .then(lastHtml  => {
-                                const lastStatementDoc = new DOMParser().parseFromString(lastHtml, 'text/html');
-                               
-                                const contentRightDiv = lastStatementDoc.querySelector("#content_right");//div that last statement is in
-                                if (contentRightDiv) {
-                               
-                                    const paragraphs = contentRightDiv.querySelectorAll("p");
-                                    
-                                    if (paragraphs.length >= 2) {
-                                        // Get the second-to-last p element
-                                        const secondToLastStatement = paragraphs[paragraphs.length - 2];
-                                        
-                                        if (secondToLastStatement) {
-                                            const lastStatementText = secondToLastStatement.textContent.trim();
-                                            data.lastStatement = lastStatementText;
-                                        } else {
-                                            data.lastStatement = "Second-to-last statement not found";
-                                        }
-                                    }
+                            .then(html => {
+                                const parser = new DOMParser();
+                                const doc = parser.parseFromString(html, 'text/html');
+        
+                                const cells = Array.from(doc.querySelectorAll("td"));
+                                const nameIndex = cells.findIndex(cell => cell.textContent.trim() === "Name");
+        
+                                if (nameIndex !== -1) {
+                                    var fullName = cells[nameIndex + 1].textContent.trim();
+                                    var [lastName, firstName] = fullName.split(',').map(part => part.trim());
+                                    var [firstName, fullName] = firstName.split(' ').map(part => part.trim());
+        
+                                    const tdcjNumber = getDataFromTable(cells, "TDCJ Number");
+                                    const ageWhenReceived = getDataFromTable(cells, "Age (when Received)");
+                                    const educationLevel = getDataFromTable(cells, "Education Level (Highest Grade Completed)");
+                                    const ageAtOffense = getDataFromTable(cells, "Age (at the time of Offense)");
+                                    const county = getDataFromTable(cells, "County");
+                                    const race = getDataFromTable(cells, "Race");
+                                    const gender = getDataFromTable(cells, "Gender");
+                                    const nativeCounty = getDataFromTable(cells, "Native County");
+        
+                                    const data = {
+                                        TDCJNumber: tdcjNumber,
+                                        FirstName: firstName,
+                                        LastName: lastName,
+                                        AgeWhenReceived: ageWhenReceived,
+                                        EducationLevel: educationLevel,
+                                        Age: ageAtOffense,
+                                        county: county,
+                                        Race: race,
+                                        gender: gender,
+                                        nativeCounty: nativeCounty,
+                                        LastStatement: '' // Initialize as empty, will fill later
+                                    };
+        
+                                    // Fetch the last statement from the second page
+                                    const lastStatementUrl = `https://thingproxy.freeboard.io/fetch/https://www.tdcj.texas.gov/death_row/dr_info/${name}last.html`;
+        
+                                    fetch(lastStatementUrl)
+                                        .then(response => {
+                                            if (!response.ok) {
+                                                throw new Error(`HTTP error! Status: ${response.status}`);
+                                            }
+                                            return response.text();
+                                        })
+                                        .then(lastHtml  => {
+                                            const lastStatementDoc = new DOMParser().parseFromString(lastHtml, 'text/html');
+                                            const contentRightDiv = lastStatementDoc.querySelector("#content_right");
+
+                                            if (contentRightDiv) {
+                                                const paragraphs = contentRightDiv.querySelectorAll("p");
+                                                if (paragraphs.length >= 2) {
+                                                    const secondToLastStatement = paragraphs[paragraphs.length - 2];
+                                                    if (secondToLastStatement) {
+                                                        const lastStatementText = secondToLastStatement.textContent.trim();
+                                                        data.LastStatement = lastStatementText;
+                                                    } else {
+                                                        data.LastStatement = "Second-to-last statement not found";
+                                                    }
+                                                }
+                                            }
+
+                                            //print to console
+                                            console.log(data);
+
+                                            fetch('http://localhost:3000/api/add', {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json', // Ensure content type is set to JSON
+                                                },
+                                                body: JSON.stringify(data), // Ensure the data is correctly stringified
+                                            })
+                                            .then(response => response.json())  // Ensure response is parsed as JSON
+                                            .then(responseData => {
+                                                console.log('Data sent successfully:', responseData);
+                                            })
+                                            .catch(error => {
+                                                console.error('Error sending data to backend:', error);
+                                            });
+                                            
+                                        })
+                                        .catch(error => console.error("Error fetching last statement:", error));
+                                } else {
+                                    console.error("Name field not found.");
                                 }
-                                
-                                console.log(JSON.stringify(data, null, 2));
-                           
                             })
-                            .catch(error => console.error("Error fetching last statement:", error));
-                    } else {
-                        console.error("Name field not found.");
+                            .catch(error => console.error("Error:", error));
                     }
-                })
-                .catch(error => console.error("Error:", error));
-        }
-        }
+                }
+            }
+        });
+    } else {
+        console.error("Input element with id 'addinput' not found");
     }
 });
 
-function getDataFromTable(cells, label) {
-    const index = cells.findIndex(cell => cell.textContent.trim() === label);
-    return index !== -1 ? cells[index + 1].textContent.trim() : "Not found";
+function sendPrisonerDataToBackend(data) {
+    fetch('http://localhost:3000/api/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+    })
+    .then(response => response.json())
+    .then(responseData => {
+        console.log('Data successfully sent to backend:', responseData);
+        alert('Prisoner data added successfully.');
+    })
+    .catch(error => {
+        console.error('Error sending data to backend:', error);
+        alert('An error occurred while adding the prisoner.');
+    });
 }
 
+function getDataFromTable(cells, label) {
+    const index = cells.findIndex(cell => cell.textContent.trim() === label);
+    if (index !== -1) {
+        return cells[index + 1] ? cells[index + 1].textContent.trim() : '';
+    }
+    return '';
+}
 
 // Add "Show More" functionality
 document.getElementById('show-more').addEventListener('click', () => {
