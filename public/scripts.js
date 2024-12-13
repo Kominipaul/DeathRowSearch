@@ -304,42 +304,27 @@ addinput.addEventListener('keypress', (event) => {
                         var [lastName, firstName] = fullName.split(',').map(part => part.trim());
                         var [firstName, fullName] = firstName.split(' ').map(part => part.trim());
     
-                        const tdcjNumber = getDataFromTable(cells, "TDCJ Number");
-                        const dob = getDataFromTable(cells, "Date of Birth");
+                        const tdcjNumber = getDataFromTable(cells, "TDCJ Number");            
                         const dateReceived = getDataFromTable(cells, "Date Received");
                         const ageWhenReceived = getDataFromTable(cells, "Age (when Received)");
                         const educationLevel = getDataFromTable(cells, "Education Level (Highest Grade Completed)");
-                        const dateOfOffense = getDataFromTable(cells, "Date of Offense");
                         const ageAtOffense = getDataFromTable(cells, "Age (at the time of Offense)");
                         const county = getDataFromTable(cells, "County");
                         const race = getDataFromTable(cells, "Race");
-                        const gender = getDataFromTable(cells, "Gender");
-                        const hairColor = getDataFromTable(cells, "Hair Color");
-                        const height = getDataFromTable(cells, "Height (in Feet and Inches)");
-                        const weight = getDataFromTable(cells, "Weight (in Pounds)");
-                        const eyeColor = getDataFromTable(cells, "Eye Color");
+                        const gender = getDataFromTable(cells, "Gender");;
                         const nativeCounty = getDataFromTable(cells, "Native County");
-                        const nativeState = getDataFromTable(cells, "Native State");
     
                         const data = {
                             firstName: firstName,
                             lastName: lastName,
                             tdcjNumber: tdcjNumber,
-                            dob: dob,
-                            dateReceived: dateReceived,
                             ageWhenReceived: ageWhenReceived,
                             educationLevel: educationLevel,
-                            dateOfOffense: dateOfOffense,
                             ageAtOffense: ageAtOffense,
                             county: county,
                             race: race,
                             gender: gender,
-                            hairColor: hairColor,
-                            height: height,
-                            weight: weight,
-                            eyeColor: eyeColor,
                             nativeCounty: nativeCounty,
-                            nativeState: nativeState
                         };
     
                           // Fetch the last statement from the second page
