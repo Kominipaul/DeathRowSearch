@@ -231,7 +231,7 @@ app.delete('/api/delete', async (req, res) => {
 
         // Ensure the command is provided
         if (!command) {
-            return res.status(400).send('Command is required.');
+            return res.status(400).send('Command is required. Expected format: "delete <TDCJNumber>".');
         }
 
         console.log('Received Delete Request Command:', command);
@@ -240,7 +240,10 @@ app.delete('/api/delete', async (req, res) => {
         const tdcjNumber = parseDeleteCommand(command);
 
         // Perform the deletion in Elasticsearch
-        await deleteFromElasticsearch(tdcjNumber, indexName);
+        const deletionResult = await deleteFromElasticsearch(tdcjNumber, indexName);
+        if (!deletionResult.success) {
+            return res.status(404).send(deletionResult.message); // Document not found
+        }
 
         // Optionally, remove the record from the CSV
         const csvFilePath = path.join(__dirname, 'Texas_Last_Statement.csv');
@@ -250,7 +253,7 @@ app.delete('/api/delete', async (req, res) => {
         res.status(200).send(`Record with TDCJNumber ${tdcjNumber} deleted successfully.`);
     } catch (error) {
         console.error('Error processing delete request:', error);
-        res.status(500).send('An error occurred while deleting the record.');
+        res.status(500).send(`An error occurred while deleting the record: ${error.message}`);
     }
 });
 
@@ -258,6 +261,7 @@ app.delete('/api/delete', async (req, res) => {
 app.post('/api/add', async (req, res) => {
     try {
         // Extract prisoner data from the request body
+        console.log("Received Data:", req.body);
         const prisonerData = req.body;
 
         // Ensure required fields are present
@@ -276,31 +280,28 @@ app.post('/api/add', async (req, res) => {
         if (esResponse.result !== 'created') {
             throw new Error('Failed to add prisoner to Elasticsearch');
         }
-
+        // Send a success response
         console.log('Prisoner added to Elasticsearch:', esResponse);
-
+        res.status(200).send('Prisoner added successfully.');
         // Append the prisoner to the CSV file
-        const csvRow = [
+        /*const csvRow = [
             prisonerData.tdcjNumber,
             prisonerData.firstName,
             prisonerData.lastName,
             prisonerData.ageAtOffense,
             prisonerData.race,
             prisonerData.county,
-            prisonerData.lastStatement.replace(/\n/g, ' '), // Replace newlines in last statement
+            prisonerData.LastStatement.replace(/\n/g, ' '), // Replace newlines in last statement
         ].join(',');
 
-        fs.appendFile(csvFilePath, `\n${csvRow}`, (err) => {
+       /* fs.appendFile(csvFilePath, `\n${csvRow}`, (err) => {
             if (err) throw err;
             console.log('Prisoner added to CSV file.');
-        });
-
-        // Send a success response
-        res.status(200).send('Prisoner added successfully.');
+        });*/
+        
     } catch (error) {
         console.error('Error adding prisoner:', error);
-        res.status(500).send('An error occurred while adding the prisoner.');
-    }
+        res.status(500).json({ error: 'An error occurred while adding the prisoner.' })    }
 });
 
 

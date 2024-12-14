@@ -283,12 +283,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 const fullName = addinput.value.trim();
         
                 if (fullName) {
+                    console.log('Processing input:', fullName);  // Log the input value
+        
                     // Split the name into last name and first name
                     const [lastName, firstName] = fullName.split(' ').map(part => part.trim());
                     if (lastName && firstName) {
-                        // Create a dynamic URL using the last name and first name
+
+                        currentOffset = 0; // Reset pagination
+                        hasMoreResults = true;
+
                         const name = `${lastName.toLowerCase()}${firstName.toLowerCase()}`;
                         const url = `https://thingproxy.freeboard.io/fetch/https://www.tdcj.texas.gov/death_row/dr_info/${name}.html`;
+        
+                        console.log('Fetching data from:', url);  // Log the URL being fetched
         
                         fetch(url)
                             .then(response => {
@@ -298,92 +305,127 @@ document.addEventListener('DOMContentLoaded', () => {
                                 return response.text();
                             })
                             .then(html => {
-                                const parser = new DOMParser();
-                                const doc = parser.parseFromString(html, 'text/html');
+                                console.log('Fetched HTML content successfully');  // Log successful fetch
         
+                                const doc = new DOMParser().parseFromString(html, 'text/html');
                                 const cells = Array.from(doc.querySelectorAll("td"));
                                 const nameIndex = cells.findIndex(cell => cell.textContent.trim() === "Name");
         
                                 if (nameIndex !== -1) {
-                                    var fullName = cells[nameIndex + 1].textContent.trim();
-                                    var [lastName, firstName] = fullName.split(',').map(part => part.trim());
-                                    var [firstName, fullName] = firstName.split(' ').map(part => part.trim());
+                                    let fullName = cells[nameIndex + 1].textContent.trim();
+                                    let [lastName, firstName] = fullName.split(',').map(part => part.trim());
+                                    firstName = firstName.split(' ')[0].trim(); // Only take the first name
         
-                                    const tdcjNumber = getDataFromTable(cells, "TDCJ Number");
-                                    const ageWhenReceived = getDataFromTable(cells, "Age (when Received)");
-                                    const educationLevel = getDataFromTable(cells, "Education Level (Highest Grade Completed)");
-                                    const ageAtOffense = getDataFromTable(cells, "Age (at the time of Offense)");
-                                    const county = getDataFromTable(cells, "County");
-                                    const race = getDataFromTable(cells, "Race");
-                                    const gender = getDataFromTable(cells, "Gender");
-                                    const nativeCounty = getDataFromTable(cells, "Native County");
-        
+                                    // Extract other data
                                     const data = {
-                                        TDCJNumber: tdcjNumber,
                                         FirstName: firstName,
                                         LastName: lastName,
-                                        AgeWhenReceived: ageWhenReceived,
-                                        EducationLevel: educationLevel,
-                                        Age: ageAtOffense,
-                                        county: county,
-                                        Race: race,
-                                        gender: gender,
-                                        nativeCounty: nativeCounty,
-                                        LastStatement: '' // Initialize as empty, will fill later
+                                        TDCJNumber: getDataFromTable(cells, "TDCJ Number"),
+                                        AgeWhenReceived: getDataFromTable(cells, "Age (when Received)"),
+                                        EducationLevel: getDataFromTable(cells, "Education Level (Highest Grade Completed)"),
+                                        Age: getDataFromTable(cells, "Age (at the time of Offense)"),
+                                        CountyOfConviction: getDataFromTable(cells, "County"),
+                                        Race: getDataFromTable(cells, "Race"),
+                                        Gender: getDataFromTable(cells, "Gender"),
+                                        NativeCounty: getDataFromTable(cells, "Native County"),
                                     };
         
-                                    // Fetch the last statement from the second page
-                                    const lastStatementUrl = `https://thingproxy.freeboard.io/fetch/https://www.tdcj.texas.gov/death_row/dr_info/${name}last.html`;
+                                    // Extract Co-Defendants and Victim Information
+                                    const contentRightDiv = doc.querySelector("#content_right");
+                                    if (contentRightDiv) {
+                                        console.log('Found content_right div');  // Log content_right div found
         
-                                    fetch(lastStatementUrl)
-                                        .then(response => {
-                                            if (!response.ok) {
-                                                throw new Error(`HTTP error! Status: ${response.status}`);
+                                        let coDefendantsCount = 0;
+                                        let victimStats = { male: 0, female: 0, white: 0, black: 0, hispanic: 0, other: 0 };
+        
+                                        // Extract Co-Defendants Information (Second-to-last paragraph)
+                                        const paragraphs = Array.from(contentRightDiv.querySelectorAll("p"));
+                                        const coDefendantsP = paragraphs[paragraphs.length - 2];  // Second-to-last <p>
+                                        if (coDefendantsP && coDefendantsP.textContent.includes("Co-Defendants")) {
+                                            console.log('Found Co-Defendants paragraph:', coDefendantsP.textContent); 
+                                            const coDefendantsText = coDefendantsP.textContent.trim();
+                                            if (coDefendantsText.toLowerCase().includes("none")) {
+                                                coDefendantsCount = 0;
+                                                console.log('No co-defendants (None)');  
+                                            } else {
+                                                coDefendantsCount = coDefendantsText.split(',').length;
+                                                console.log('Number of co-defendants:', coDefendantsCount);  
                                             }
-                                            return response.text();
-                                        })
-                                        .then(lastHtml  => {
-                                            const lastStatementDoc = new DOMParser().parseFromString(lastHtml, 'text/html');
-                                            const contentRightDiv = lastStatementDoc.querySelector("#content_right");
+                                        }
+        
+                                        // Extract Victim Race and Gender Information (Last paragraph)
+                                        const victimRaceGenderP = paragraphs[paragraphs.length - 1];
+                                        if (victimRaceGenderP) {
+                                            console.log('Found Race and Gender of Victim paragraph:', victimRaceGenderP.textContent);  // Log the content of the paragraph
+        
+                                            if (victimRaceGenderP.textContent.includes("Race and Gender of Victim")) {
+                                                const victimRaceGenderText = victimRaceGenderP.textContent.trim();
+                                                const victimDetails = victimRaceGenderText.split(',').map(item => item.trim());
+                                                victimDetails.forEach(detail => {
 
-                                            if (contentRightDiv) {
-                                                const paragraphs = contentRightDiv.querySelectorAll("p");
-                                                if (paragraphs.length >= 2) {
-                                                    const secondToLastStatement = paragraphs[paragraphs.length - 2];
-                                                    if (secondToLastStatement) {
-                                                        const lastStatementText = secondToLastStatement.textContent.trim();
-                                                        data.LastStatement = lastStatementText;
-                                                    } else {
-                                                        data.LastStatement = "Second-to-last statement not found";
+                                                    if (detail.toLowerCase().includes("male")) victimStats.male++;
+                                                    else if (detail.toLowerCase().includes("female")) victimStats.female++;
+        
+                                                    // Check for race categories
+                                                    if (detail.toLowerCase().includes("white")) victimStats.white++;
+                                                    else if (detail.toLowerCase().includes("black")) victimStats.black++;
+                                                    else if (detail.toLowerCase().includes("hispanic")) victimStats.hispanic++;
+                                                    else victimStats.other++;
+                                                });
+                                                console.log('Victim Stats:', victimStats);  // Log victim stats
+                                            }
+                                        }
+        
+                                        // Add co-defendant count and victim stats to data
+                                        data.Codefendants = coDefendantsCount;
+                                        data.WhiteVictim = victimStats.white;
+                                        data.BlackVictim = victimStats.black;
+                                        data.HispanicVictim = victimStats.hispanic;
+                                        data.VictimOther_Races = victimStats.other;
+                                        data.MaleVictim=victimStats.male;
+                                        data.FemaleVictim=victimStats.female
+        
+                                        // Fetch the last statement from the second page
+                                        const lastStatementUrl = `https://thingproxy.freeboard.io/fetch/https://www.tdcj.texas.gov/death_row/dr_info/${name}last.html`;
+        
+                                        fetch(lastStatementUrl)
+                                            .then(response => {
+                                                if (!response.ok) {
+                                                    throw new Error(`HTTP error! Status: ${response.status}`);
+                                                }
+                                                return response.text();
+                                            })
+                                            .then(lastHtml => {
+                                                const lastStatementDoc = new DOMParser().parseFromString(lastHtml, 'text/html');
+                                                const contentRightDiv = lastStatementDoc.querySelector("#content_right");
+                                                if (contentRightDiv) {
+                                                    const paragraphs = contentRightDiv.querySelectorAll("p");
+                                                    if (paragraphs.length >= 2) {
+                                                        var secondToLastStatement = paragraphs[paragraphs.length - 2];
+                                                        if (secondToLastStatement) {
+                                                            var lastStatementText = secondToLastStatement.textContent.trim();
+                                                            if(lastStatementText=="Last Statement:"){
+                                                                var secondToLastStatement = paragraphs[paragraphs.length - 1];
+                                                                var lastStatementText = secondToLastStatement.textContent.trim();
+                                                            }
+                                                            data.LastStatement = lastStatementText;
+                                                        }
                                                     }
                                                 }
-                                            }
-
-                                            //print to console
-                                            console.log(data);
-
-                                            fetch('http://localhost:3000/api/add', {
-                                                method: 'POST',
-                                                headers: {
-                                                    'Content-Type': 'application/json', // Ensure content type is set to JSON
-                                                },
-                                                body: JSON.stringify(data), // Ensure the data is correctly stringified
+        
+                                                // Log final data with last statement
+                                                console.log("Final data:", JSON.stringify(data, null, 2));
+                                                sendPrisonerDataToBackend(data);
+                                                fetchResults("FirstName = "+firstName+" AND LastName = "+lastName,false);
                                             })
-                                            .then(response => response.json())  // Ensure response is parsed as JSON
-                                            .then(responseData => {
-                                                console.log('Data sent successfully:', responseData);
-                                            })
-                                            .catch(error => {
-                                                console.error('Error sending data to backend:', error);
-                                            });
+                                            .catch(error => console.error("Error fetching last statement:", error));
                                             
-                                        })
-                                        .catch(error => console.error("Error fetching last statement:", error));
+                                    }
                                 } else {
                                     console.error("Name field not found.");
                                 }
                             })
-                            .catch(error => console.error("Error:", error));
+                            .catch(error => console.error("Error fetching main page:", error));
                     }
                 }
             }
@@ -408,7 +450,7 @@ function sendPrisonerDataToBackend(data) {
     })
     .catch(error => {
         console.error('Error sending data to backend:', error);
-        alert('An error occurred while adding the prisoner.');
+        //alert('An error occurred while adding the prisoner.');
     });
 }
 
