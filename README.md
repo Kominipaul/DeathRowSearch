@@ -128,5 +128,6 @@ And visit : http://localhost:3000/
 The application will connect to Elasticsearch and start serving requests.
 
 ---
+![image](https://github.com/user-attachments/assets/80025546-2741-4481-99f9-3e5efcb69884)
 
 
